@@ -1,6 +1,3 @@
-import {describe,expect,it} from 'vitest';
-import {decryptSecret,encryptSecret} from '../src/lib/vault';
-describe('local encrypted API key vault',()=>{
- it('encrypts and decrypts with correct passphrase',async()=>{const encrypted=await encryptSecret('senha-mestra-segura','sk-example-key-123456');expect(encrypted.ciphertext).not.toContain('sk-example-key-123456');await expect(decryptSecret('senha-mestra-segura',encrypted)).resolves.toBe('sk-example-key-123456')});
- it('rejects a wrong passphrase',async()=>{const encrypted=await encryptSecret('senha-mestra-segura','sk-example-key-123456');await expect(decryptSecret('senha-incorreta',encrypted)).rejects.toThrow()});
-});
+// @vitest-environment node
+import{describe,expect,it}from'vitest';import{decryptSecret,encryptSecret}from'../src/lib/vault';
+describe('local encrypted API key vault',()=>{it('encrypts and decrypts with correct passphrase',async()=>{const encrypted=await encryptSecret('senha-mestra-segura','sk-example-key-123456');expect(encrypted.ciphertext).not.toContain('sk-example-key-123456');await expect(decryptSecret('senha-mestra-segura',encrypted)).resolves.toBe('sk-example-key-123456')});it('rejects a wrong passphrase',async()=>{const encrypted=await encryptSecret('senha-mestra-segura','sk-example-key-123456');await expect(decryptSecret('senha-incorreta',encrypted)).rejects.toThrow()})});
