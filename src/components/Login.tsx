@@ -1,5 +1,18 @@
-import {useEffect,useRef,useState} from 'react';import{ShieldCheck,Waves}from'lucide-react';import type{UserProfile}from'../types';
-declare global{interface Window{google?:{accounts:{id:{initialize(options:{client_id:string;callback:(response:{credential:string})=>void}):void;renderButton(target:HTMLElement,options:Record<string,string|number>):void}}}}
+import {useEffect,useRef,useState} from 'react';
+import {ShieldCheck,Waves} from 'lucide-react';
+import type {UserProfile} from '../types';
+declare global {
+ interface Window {
+  google?: {
+   accounts: {
+    id: {
+     initialize(options:{client_id:string;callback:(response:{credential:string})=>void}):void;
+     renderButton(target:HTMLElement,options:Record<string,string|number>):void;
+    }
+   }
+  }
+ }
+}
 export default function Login({onAuthenticated}:{onAuthenticated:(user:UserProfile)=>void}){
  const button=useRef<HTMLDivElement>(null);const[csrf,setCsrf]=useState('');const[error,setError]=useState('');const[busy,setBusy]=useState(false);const clientId=import.meta.env.VITE_GOOGLE_CLIENT_ID;
  useEffect(()=>{let alive=true;fetch('/api/auth/csrf',{credentials:'same-origin'}).then(r=>r.json()).then((d:{csrfToken?:string})=>{if(alive)setCsrf(d.csrfToken||'')}).catch(()=>{if(alive)setError('Não foi possível preparar a autenticação segura.')});return()=>{alive=false}},[]);
