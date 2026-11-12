@@ -1,0 +1,2 @@
+import type{VercelRequest,VercelResponse}from'@vercel/node';import{clearSessionCookie,assertSameOrigin,jsonError}from'../_lib/auth';
+export default function handler(req:VercelRequest,res:VercelResponse){if(req.method!=='POST')return res.status(405).json({error:'Método não permitido.'});try{assertSameOrigin(req);clearSessionCookie(res);return res.status(200).json({ok:true})}catch{return jsonError(res,403,'Origem não autorizada.')}}

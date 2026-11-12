@@ -1,0 +1,2 @@
+import type{VercelRequest,VercelResponse}from'@vercel/node';import{randomBytes}from'node:crypto';
+export default function handler(req:VercelRequest,res:VercelResponse){if(req.method!=='GET')return res.status(405).json({error:'Método não permitido.'});const token=randomBytes(32).toString('hex'),secure=process.env.NODE_ENV==='production'?'; Secure':'';res.setHeader('Set-Cookie',`jarvis_csrf=${token}; Path=/; SameSite=Lax; Max-Age=600${secure}`);return res.status(200).json({csrfToken:token})}

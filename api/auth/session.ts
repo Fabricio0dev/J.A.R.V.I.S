@@ -1,0 +1,2 @@
+import type{VercelRequest,VercelResponse}from'@vercel/node';import{requireSession,jsonError}from'../_lib/auth';
+export default async function handler(req:VercelRequest,res:VercelResponse){if(req.method!=='GET')return res.status(405).json({error:'Método não permitido.'});try{const user=await requireSession(req);res.setHeader('Cache-Control','no-store');return res.status(200).json({user})}catch{return jsonError(res,401,'Sessão não encontrada ou expirada.')}}
