@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JARVIS</title>
+<style>
+:root{--bg:#02060f;--p:rgba(8,24,48,.62);--c:#38e1ff;--c2:#2f6bff;--t:#d8f6ff;--m:#7fa6bd;--e:#ff5b6e;--b:rgba(56,225,255,.28)}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:radial-gradient(ellipse at 50% 40%,#06183a 0,var(--bg) 70%);color:var(--t);font:15px/1.45 "Segoe UI",system-ui,sans-serif;overflow:hidden;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+button,input,select{font:inherit;color:inherit}
+button{background:rgba(56,225,255,.08);border:1px solid var(--b);border-radius:8px;padding:.5em .9em;cursor:pointer}
+button:hover{background:rgba(56,225,255,.2)}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--c)}
+input,select{background:rgba(0,10,25,.7);border:1px solid var(--b);border-radius:8px;padding:.5em .7em;min-width:0}
+.panel{background:var(--p);border:1px solid var(--b);border-radius:14px;backdrop-filter:blur(10px)}
+#core{position:fixed;inset:0;width:100%;height:100%}
+#login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:30;background:rgba(2,6,15,.92);padding:16px}
+#login .panel{max-width:460px;padding:24px;display:grid;gap:12px}
+#login h1{margin:0;font-size:34px;letter-spacing:.35em;font-weight:300;color:var(--c)}
+.small{font-size:12.5px;color:var(--m)}
+#app{position:fixed;inset:0;display:none}
+header{position:absolute;top:env(safe-area-inset-top);left:0;right:0;display:flex;gap:8px;align-items:center;padding:10px 12px;z-index:5}
+#st{flex:1;text-align:center;color:var(--c);letter-spacing:.12em;font-weight:300}
+#av{width:32px;height:32px;border-radius:50%;border:1px solid var(--b)}
+#log{position:absolute;left:12px;top:60px;bottom:84px;width:min(380px,36vw);overflow:auto;display:flex;flex-direction:column;gap:8px;z-index:4;padding-right:4px}
+.msg{padding:8px 12px;border-radius:12px;white-space:pre-wrap;word-break:break-word}
+.u{align-self:flex-end;background:rgba(47,107,255,.25);border:1px solid rgba(47,107,255,.5)}
+.j{background:var(--p);border:1px solid var(--b)}
+.msg.err{border-color:var(--e);color:#ffc2c9}
+.src{display:block;font-size:12.5px;color:var(--c);margin-top:4px;word-break:break-all}
+#cards{position:absolute;right:12px;top:60px;bottom:84px;width:min(340px,32vw);overflow:auto;display:flex;flex-direction:column;gap:10px;z-index:4}
+.card{padding:12px}.card h3{margin:0 0 6px;font-size:14px;font-weight:600;color:var(--c)}.card p{margin:2px 0}
+form{position:absolute;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(560px,calc(100% - 24px));display:flex;gap:8px;z-index:6}
+form input{flex:1;background:rgba(0,10,25,.8)}
+#mic.on{background:var(--c);color:#001018}
+#side{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:rgba(3,10,24,.97);border-left:1px solid var(--b);z-index:20;overflow:auto;padding:16px;display:none}
+#side.open{display:block}
+#side section{border-top:1px solid var(--b);padding:12px 0;display:grid;gap:8px}
+#side h2{margin:0;font-size:15px;color:var(--c);font-weight:600}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.row>input{flex:1}
+.dot{width:9px;height:9px;border-radius:50%;background:#555;display:inline-block}.dot.ok{background:#3dff9a}.dot.bad{background:var(--e)}
+.mem{display:flex;gap:6px;justify-content:space-between;border:1px solid var(--b);border-radius:8px;padding:6px 8px}
+@media(max-width:760px){#log{width:calc(100% - 24px);top:auto;bottom:84px;max-height:30vh}#cards{width:calc(100% - 24px);top:56px;bottom:auto;max-height:26vh}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<canvas id="core" aria-hidden="true"></canvas>
+
+<div id="login"><div class="panel">
+<h1>JARVIS</h1>
+<div class="small">O acesso exige login com Google. O Client ID é público (não é segredo): crie um em Google Cloud Console > APIs e serviços > Credenciais > ID do cliente OAuth (Aplicativo da Web) e adicione a URL onde este arquivo está hospedado em “Origens JavaScript autorizadas”.</div>
+<input id="cid" placeholder="Google OAuth Client ID (xxxx.apps.googleusercontent.com)" autocomplete="off">
+<button id="cidSave">Salvar Client ID</button>
+<div id="gbtn"></div>
+<div id="lerr" class="small" style="color:var(--e)"></div>
+<div class="small">O login identifica sua conta e separa seus dados locais. Ele não dá acesso a Gmail, Drive ou Agenda: isso só é pedido quando você usa o recurso.</div>
+</div></div>
+
+<div id="app">
+<header>
+<button id="menu" aria-label="Configurações">☰</button>
+<div id="st">EM ESPERA</div>
+<img id="av" alt="" hidden>
+</header>
+<div id="log" aria-live="polite"></div>
+<div id="cards"></div>
+<form id="f" autocomplete="off">
+<button type="button" id="mic" aria-label="Ativar ou desativar microfone">🎙</button>
+<input id="in" placeholder="Digite ou diga “Eae Jarvis…”" maxlength="4000">
+<button>Enviar</button>
+</form>
+
+<aside id="side" class="panel" aria-label="Configurações">
+<div class="row"><h2 style="flex:1">CONFIGURAÇÕES</h2><button id="close">Fechar</button></div>
+
+<section><h2>Conta</h2><div id="who" class="small"></div><button id="logout">Encerrar sessão</button></section>
+
+<section><h2>Voz</h2>
+<label class="row">Voz <select id="voice"></select></label>
+<label class="row">Velocidade <input id="rate" type="range" min=".6" max="1.6" step=".1"></label>
+<label class="row">Tom <input id="pitch" type="range" min=".5" max="1.5" step=".1"></label>
+<label class="row">Volume <input id="vol" type="range" min="0" max="1" step=".1"></label>
+<label class="row"><input type="checkbox" id="tts"> Resposta falada</label>
+<label class="row"><input type="checkbox" id="wake"> Exigir “Eae Jarvis” para comandos por voz</label>
+<div class="small">O reconhecimento de voz usa o serviço do navegador (no Chrome/Edge, o áudio é enviado ao fornecedor do navegador). O microfone só fica ativo quando o botão 🎙 está aceso. Voz masculina depende das vozes instaladas no seu sistema.</div>
+</section>
+
+<section><h2>Central de inteligências</h2>
+<label class="row">Modo
+<select id="mode"><option value="auto">Automático</option><option value="main">Principal</option><option value="best">Melhor resposta (2 IAs + consolidação)</option><option value="eco">Econômico</option></select></label>
+<label class="row"><input type="checkbox" id="fb"> Tentar outra IA conectada se houver erro</label>
+<label class="row">Proxy (opcional) <input id="proxy" placeholder="https://seu-proxy.exemplo/forward"></label>
+<div class="small">Se um provedor bloquear chamadas do navegador (CORS), informe um proxy seu. Ele recebe POST {url, headers, body} e repete a chamada, devolvendo a resposta original.</div>
+<div id="ais"></div>
+<datalist id="dl"></datalist>
+<div class="small">Chaves ficam só na memória desta aba. Para guardá-las, defina uma senha: elas são criptografadas (AES-GCM) no seu navegador.</div>
+<div class="row"><input id="pw" type="password" placeholder="Senha do cofre"><button id="vSave">Guardar</button><button id="vOpen">Abrir</button></div>
+</section>
+
+<section><h2>Memória e aprendizado</h2>
+<div class="small">Diga “lembre que …” para salvar. Apenas o que está aqui é usado nas respostas. Nada treina os modelos externos; a memória é só sua, neste navegador.</div>
+<div class="row"><input id="memIn" placeholder="Nova memória"><button id="memAdd">Adicionar</button></div>
+<div id="mems"></div>
+<div class="row"><button id="exp">Exportar</button><button id="wipe">Apagar tudo</button></div>
+</section>
+
+<section><h2>Google</h2>
+<div class="small">Agenda (somente leitura) é pedida ao usar comandos como “quais meus compromissos de amanhã”. Revogue em myaccount.google.com/permissions.</div>
+<input id="cid2" placeholder="Google OAuth Client ID (só necessário para a Agenda)" autocomplete="off">
+<button id="gcal">Autorizar Agenda agora</button><div id="gst" class="small"></div>
+</section>
+
+<section><h2>Interface</h2>
+<label class="row">Densidade de partículas <input id="fx" type="range" min=".2" max="1" step=".1"></label>
+</section>
+</aside>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+"use strict";
+/* ===== 1. Utilidades ===== */
+const $=s=>document.querySelector(s);
+const el=(t,c,x)=>{const n=document.createElement(t);if(c)n.className=c;if(x!=null)n.textContent=x;return n};
+const S={user:null,keys:{},mem:[],chat:[],db:null,state:"idle",tok:null,
+ cfg:{main:"openai",mode:"auto",models:{},rate:1,pitch:.85,vol:1,voice:"",tts:true,wake:true,fb:true,proxy:"",fx:.8}};
+const AIS={
+ openai:{n:"OpenAI / ChatGPT",ph:"nome do modelo (veja a lista após testar)"},
+ gemini:{n:"Google Gemini",ph:"nome do modelo (veja a lista após testar)"},
+ anthropic:{n:"Anthropic / Claude",ph:"nome do modelo (veja a lista após testar)"},
+ perplexity:{n:"Perplexity",ph:"nome do modelo (consulte a documentação)"}};
+const STL={idle:"EM ESPERA",listening:"OUVINDO",thinking:"PROCESSANDO",searching:"PESQUISANDO",speaking:"FALANDO",executing:"EXECUTANDO",error:"ERRO"};
+function setState(s,txt){S.state=s;$("#st").textContent=txt||STL[s]}
+function say(role,text,srcs){const d=el("div","msg "+role,text);if(role==="err")d.className="msg j err";
+ (srcs||[]).forEach(x=>{if(/^https?:\/\//.test(x.url)){const a=el("a","src",x.title||x.url);a.href=x.url;a.target="_blank";a.rel="noopener noreferrer";d.append(a)}});
+ $("#log").append(d);$("#log").scrollTop=1e9;return d}
+function card(title,lines,links){const c=el("div","panel card");c.append(el("h3","",title));lines.forEach(l=>c.append(el("p","",l)));
+ (links||[]).forEach(x=>{if(/^https?:\/\//.test(x.url)){const a=el("a","src",x.title);a.href=x.url;a.target="_blank";a.rel="noopener noreferrer";c.append(a)}});
+ const k=$("#cards");k.prepend(c);while(k.children.length>5)k.lastChild.remove()}
+
+/* ===== 2. Armazenamento por usuário (IndexedDB) ===== */
+function openDb(sub){return new Promise((ok,no)=>{const r=indexedDB.open("jarvis_"+sub,1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
+const dbGet=k=>new Promise(ok=>{const q=S.db.transaction("kv").objectStore("kv").get(k);q.onsuccess=()=>ok(q.result);q.onerror=()=>ok(undefined)});
+const dbSet=(k,v)=>new Promise(ok=>{const t=S.db.transaction("kv","readwrite");t.objectStore("kv").put(v,k);t.oncomplete=ok});
+const saveAll=()=>Promise.all([dbSet("cfg",S.cfg),dbSet("mem",S.mem),dbSet("chat",S.chat.slice(-60))]);
+
+/* ===== 3. Autenticação Google ===== */
+function jwt(t){const p=t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/");return JSON.parse(decodeURIComponent(escape(atob(p))))}
+function initGoogle(){
+ const cid=localStorage.getItem("jv_cid");$("#cid").value=cid||"";
+ if(!cid){$("#lerr").textContent="Informe o Client ID para habilitar o login.";return}
+ if(!window.google||!google.accounts){setTimeout(initGoogle,400);return}
+ google.accounts.id.initialize({client_id:cid,callback:r=>{try{sessionStorage.setItem("jv_cred",r.credential);enter(jwt(r.credential))}catch(e){$("#lerr").textContent="Falha no login: "+e.message}}});
+ $("#gbtn").replaceChildren();google.accounts.id.renderButton($("#gbtn"),{theme:"filled_blue",size:"large",text:"signin_with",locale:"pt-BR"});
+ const old=sessionStorage.getItem("jv_cred");if(old){try{const p=jwt(old);if(p.exp*1000>Date.now())enter(p)}catch(e){}}}
+$("#cidSave").onclick=()=>{const v=$("#cid").value.trim();if(!/^[\w.-]+\.apps\.googleusercontent\.com$/.test(v)){$("#lerr").textContent="Client ID inválido.";return}localStorage.setItem("jv_cid",v);$("#lerr").textContent="";initGoogle()};
+async function enter(p){
+ S.user={sub:p.sub,name:p.name||p.email,pic:p.picture,email:p.email};
+ S.db=await openDb(p.sub);
+ Object.assign(S.cfg,(await dbGet("cfg"))||{});S.mem=(await dbGet("mem"))||[];S.chat=(await dbGet("chat"))||[];
+ $("#login").style.display="none";$("#app").style.display="block";
+ if(/^https:\/\//.test(S.user.pic||"")){$("#av").src=S.user.pic;$("#av").hidden=false}
+ $("#who").textContent=S.user.name+" ("+S.user.email+")";
+ $("#log").replaceChildren();S.chat.slice(-12).forEach(m=>say(m.role==="user"?"u":"j",m.content));
+ buildSettings();setState("idle");
+ say("j","Sistemas online, "+S.user.name.split(" ")[0]+". Diga “Eae Jarvis” após ativar o microfone, ou digite abaixo. Conecte ao menos uma IA em ☰ > Central de inteligências.")}
+$("#logout").onclick=()=>{sessionStorage.removeItem("jv_cred");S.keys={};speechSynthesis.cancel();location.reload()};
+
+/* ===== 4. Chamadas HTTP e provedores de IA ===== */
+async function http(url,opt){
+ try{
+  const r=S.cfg.proxy?await fetch(S.cfg.proxy,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url,headers:opt.headers||{},body:opt.body||null,method:opt.method||"GET"})}):await fetch(url,opt);
+  const txt=await r.text();let j;try{j=JSON.parse(txt)}catch(e){j=null}
+  if(!r.ok)throw new Error("HTTP "+r.status+": "+((j&&(j.error&&(j.error.message||j.error)||j.message))||txt.slice(0,160)));
+  return j}catch(e){if(e instanceof TypeError)throw new Error("Falha de rede ou bloqueio CORS. Verifique a conexão ou configure um proxy.");throw e}}
+const H={"Content-Type":"application/json"};
+const P={
+ async list(id){const k=S.keys[id];
+  if(id==="openai"){const j=await http("https://api.openai.com/v1/models",{headers:{Authorization:"Bearer "+k}});return j.data.map(m=>m.id)}
+  if(id==="gemini"){const j=await http("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",{headers:{"x-goog-api-key":k}});return j.models.filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent")).map(m=>m.name.replace("models/",""))}
+  if(id==="anthropic"){const j=await http("https://api.anthropic.com/v1/models",{headers:{"x-api-key":k,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"}});return j.data.map(m=>m.id)}
+  if(id==="perplexity"){const m=S.cfg.models.perplexity;if(!m)throw new Error("Informe o modelo para testar (o Perplexity não lista modelos).");await P.chat("perplexity",[{role:"user",content:"ping"}],"Responda apenas: ok",8);return[m]}},
+ async chat(id,msgs,sys,max){const k=S.keys[id],m=S.cfg.models[id];if(!k)throw new Error("Sem chave para "+AIS[id].n);if(!m)throw new Error("Escolha o modelo de "+AIS[id].n);
+  max=max||1500;
+  if(id==="openai"||id==="perplexity"){const u=id==="openai"?"https://api.openai.com/v1/chat/completions":"https://api.perplexity.ai/chat/completions";
+   const j=await http(u,{method:"POST",headers:{...H,Authorization:"Bearer "+k},body:JSON.stringify({model:m,messages:[{role:"system",content:sys},...msgs]})});
+   const src=(j.search_results||[]).map(x=>({title:x.title,url:x.url})).concat((j.citations||[]).filter(x=>typeof x==="string").map(x=>({title:x,url:x})));
+   return{text:j.choices[0].message.content,sources:src.slice(0,6)}}
+  if(id==="anthropic"){const j=await http("https://api.anthropic.com/v1/messages",{method:"POST",headers:{...H,"x-api-key":k,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:m,max_tokens:max,system:sys,messages:msgs})});
+   return{text:j.content.filter(b=>b.type==="text").map(b=>b.text).join("\n"),sources:[]}}
+  if(id==="gemini"){const j=await http("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(m)+":generateContent",{method:"POST",headers:{...H,"x-goog-api-key":k},body:JSON.stringify({systemInstruction:{parts:[{text:sys}]},contents:msgs.map(x=>({role:x.role==="assistant"?"model":"user",parts:[{text:x.content}]}))})});
+   const c=j.candidates&&j.candidates[0];if(!c||!c.content)throw new Error("Gemini não retornou conteúdo.");return{text:c.content.parts.map(p=>p.text||"").join(""),sources:[]}}}};
+const connected=()=>Object.keys(AIS).filter(i=>S.keys[i]&&S.cfg.models[i]);
+function order(text){const c=connected();if(!c.length)return[];const mode=S.cfg.mode;let first=c.includes(S.cfg.main)?S.cfg.main:c[0];
+ if(mode==="auto"||mode==="best"){
+  if(/(notícia|noticias|hoje|atual|recente|últimas|preço|cotação|lançamento|pesquis)/i.test(text)&&c.includes("perplexity"))first="perplexity";
+  else if(/(código|programa|função|bug|javascript|python|html|css|sql|script)/i.test(text)&&c.includes("anthropic"))first="anthropic";
+  else if(text.length>3000&&c.includes("gemini"))first="gemini"}
+ return[first,...c.filter(i=>i!==first)]}
+function sysPrompt(){return "Você é JARVIS, assistente pessoal de IA. Fale em português brasileiro, com elegância, objetividade e bom humor sutil quando cabível; chame o usuário de “senhor” apenas se ele preferir. Não invente fatos: diferencie fato, estimativa e opinião e admita incerteza. Respostas curtas por padrão, pois serão faladas; evite markdown pesado. Data atual: "+new Date().toLocaleString("pt-BR")+". Usuário: "+S.user.name+". Memórias autorizadas pelo usuário:\n"+(S.mem.map(m=>"- "+m.t).join("\n")||"(nenhuma)")}
+async function ask(text){
+ const ord=order(text);if(!ord.length)throw new Error("Nenhuma IA conectada. Abra ☰ > Central de inteligências, informe a chave, escolha o modelo e teste a conexão.");
+ const msgs=S.chat.slice(-10).map(m=>({role:m.role,content:m.content}));
+ const tryOne=async id=>{setState(id==="perplexity"?"searching":"thinking",id==="perplexity"?"PESQUISANDO":"PROCESSANDO · "+AIS[id].n.toUpperCase());return P.chat(id,msgs,sysPrompt())};
+ if(S.cfg.mode==="best"&&ord.length>1){
+  setState("thinking","CONSULTANDO "+Math.min(2,ord.length)+" IAs");
+  const rs=await Promise.allSettled(ord.slice(0,2).map(i=>P.chat(i,msgs,sysPrompt())));
+  const ok=rs.map((r,i)=>r.status==="fulfilled"?{id:ord[i],...r.value}:null).filter(Boolean);
+  if(ok.length===1)return ok[0];
+  if(ok.length===2){setState("thinking","CONSOLIDANDO");
+   const q=[{role:"user",content:"Pergunta: "+text+"\n\nResposta A ("+AIS[ok[0].id].n+"):\n"+ok[0].text+"\n\nResposta B ("+AIS[ok[1].id].n+"):\n"+ok[1].text+"\n\nCompare, aponte divergências em uma frase e entregue a melhor resposta final, concisa."}];
+   const f=await P.chat(ord[0],q,sysPrompt());return{...f,sources:ok.flatMap(x=>x.sources).slice(0,6)}}}
+ let err;for(const id of S.cfg.mode==="best"?ord:(S.cfg.fb?ord:ord.slice(0,1))){try{return await tryOne(id)}catch(e){err=e;if(!S.cfg.fb)break;say("err",AIS[id].n+": "+e.message+(ord.length>1?" Tentando outra IA…":""))}}
+ throw err}
+
+/* ===== 5. Ferramentas (Tools) ===== */
+const SITES={youtube:"https://www.youtube.com",google:"https://www.google.com",gmail:"https://mail.google.com",github:"https://github.com",wikipedia:"https://pt.wikipedia.org",estácio:"https://estacio.br",estacio:"https://estacio.br",honda:"https://www.honda.com.br",whatsapp:"https://web.whatsapp.com"};
+const WMO={0:"céu limpo",1:"predominantemente limpo",2:"parcialmente nublado",3:"nublado",45:"neblina",48:"neblina",51:"garoa",53:"garoa",55:"garoa forte",61:"chuva fraca",63:"chuva",65:"chuva forte",80:"pancadas de chuva",81:"pancadas de chuva",82:"pancadas fortes",95:"tempestade",96:"tempestade com granizo",99:"tempestade com granizo"};
+const TOOLS=[
+ {id:"calc",test:t=>/^\s*(calcule|quanto é|quanto e)\s+([\d\s+\-*/().,%]+)$/i.exec(t),run:async m=>{const e=m[2].replace(/,/g,".").replace(/(\d+(\.\d+)?)%/g,"($1/100)");if(!/^[\d\s+\-*/().]+$/.test(e))throw new Error("Expressão inválida.");const v=Function('"use strict";return ('+e+')')();if(!isFinite(v))throw new Error("Resultado inválido.");return"O resultado é "+Number(v.toFixed(6)).toLocaleString("pt-BR")+"."}},
+ {id:"mem",test:t=>/^\s*(lembre|guarde|memorize)(-se)?\s+(que\s+)?(.+)/i.exec(t),run:async m=>{S.mem.push({t:m[4].trim().slice(0,300),d:Date.now()});await saveAll();renderMem();return"Anotado na sua memória pessoal. Você pode revisar ou apagar em ☰ > Memória."}},
+ {id:"open",test:t=>/^\s*(abra|abrir|acesse|entre no|vá para)\s+(o |a |no |na )?(site (do |da |de )?)?(.+)/i.exec(t),run:async m=>{const k=m[5].trim().toLowerCase().replace(/[.!?]+$/,"");const u=SITES[k]||("https://www.google.com/search?q="+encodeURIComponent(m[5]));
+   card("Abrir página",[u],[{title:"Abrir em nova guia",url:u}]);const w=window.open(u,"_blank","noopener");return w?"Abrindo "+k+" em uma nova guia.":"O navegador bloqueou a nova guia. Use o link no painel para abrir."}},
+ {id:"wx",test:t=>/(tempo|clima|previsão|temperatura|chover|chuva)/i.exec(t),run:async(m,t)=>weather(t)},
+ {id:"cal",test:t=>/(compromisso|agenda|reuni(ão|oes|ões)|horário livre)/i.exec(t)&&!/(marque|agende|crie)/i.test(t),run:async(m,t)=>calendar(t)}];
+async function weather(t){
+ let lat,lon,name;const city=(/\b(?:em|para|de)\s+([A-Za-zÀ-ú\s]{3,40}?)(?:\s+(?:amanhã|hoje|agora)|[?.!,]|$)/i.exec(t)||[])[1];
+ if(city&&!/^(hoje|amanhã|manhã|tarde|noite)$/i.test(city.trim())){const g=await http("https://geocoding-api.open-meteo.com/v1/search?count=1&language=pt&name="+encodeURIComponent(city.trim()));if(!g.results)throw new Error("Não encontrei a cidade “"+city.trim()+"”.");({latitude:lat,longitude:lon,name}=g.results[0])}
+ else{const p=await new Promise((ok,no)=>navigator.geolocation?navigator.geolocation.getCurrentPosition(ok,()=>no(new Error("Sem permissão de localização. Diga a cidade, por exemplo: “tempo em Niterói”.")),{timeout:10000}):no(new Error("Geolocalização indisponível. Diga a cidade.")));lat=p.coords.latitude;lon=p.coords.longitude;name="sua localização"}
+ const w=await http("https://api.open-meteo.com/v1/forecast?latitude="+lat+"&longitude="+lon+"&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code&timezone=auto&forecast_days=4");
+ const c=w.current,d=w.daily,tom=/amanhã/i.test(t);const rows=d.time.map((x,i)=>new Date(x+"T12:00").toLocaleDateString("pt-BR",{weekday:"short",day:"numeric"})+": "+Math.round(d.temperature_2m_min[i])+"–"+Math.round(d.temperature_2m_max[i])+"°C, chuva "+(d.precipitation_probability_max[i]??"?")+"%, "+(WMO[d.weather_code[i]]||""));
+ card("Clima · "+name,["Agora: "+Math.round(c.temperature_2m)+"°C (sensação "+Math.round(c.apparent_temperature)+"°C), "+(WMO[c.weather_code]||"")+", umidade "+c.relative_humidity_2m+"%, vento "+Math.round(c.wind_speed_10m)+" km/h",...rows],[{title:"Fonte: Open-Meteo",url:"https://open-meteo.com"}]);
+ if(tom)return"Amanhã em "+name+": entre "+Math.round(d.temperature_2m_min[1])+" e "+Math.round(d.temperature_2m_max[1])+" graus, "+(WMO[d.weather_code[1]]||"")+", com "+(d.precipitation_probability_max[1]??"?")+"% de chance de chuva.";
+ return"Em "+name+" agora faz "+Math.round(c.temperature_2m)+" graus, sensação de "+Math.round(c.apparent_temperature)+", "+(WMO[c.weather_code]||"")+". Chance de chuva hoje: "+(d.precipitation_probability_max[0]??"?")+"%."}
+function gToken(){return new Promise((ok,no)=>{if(S.tok&&S.tok.exp>Date.now())return ok(S.tok.v);const cid=localStorage.getItem("jv_cid");
+ if(!cid)return no(new Error("Para usar a Agenda, informe o Google Client ID em ☰ > Google."));
+ if(!window.google||!google.accounts.oauth2)return no(new Error("Biblioteca do Google indisponível."));
+ google.accounts.oauth2.initTokenClient({client_id:cid,scope:"https://www.googleapis.com/auth/calendar.readonly",callback:r=>{if(r.error)return no(new Error("Autorização negada: "+r.error));S.tok={v:r.access_token,exp:Date.now()+(r.expires_in-60)*1000};$("#gst").textContent="Agenda autorizada nesta sessão.";ok(S.tok.v)},error_callback:e=>no(new Error("Autorização cancelada ou bloqueada ("+(e.type||"erro")+")."))}).requestAccessToken()})}
+async function calendar(t){
+ const tok=await gToken();const a=new Date();if(/amanhã/i.test(t))a.setDate(a.getDate()+1);a.setHours(0,0,0,0);const b=new Date(a);b.setDate(b.getDate()+1);
+ const j=await http("https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin="+a.toISOString()+"&timeMax="+b.toISOString(),{headers:{Authorization:"Bearer "+tok}});
+ const ev=(j.items||[]).map(e=>{const s=e.start.dateTime?new Date(e.start.dateTime).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"dia todo";return s+" · "+(e.summary||"(sem título)")});
+ card("Agenda",ev.length?ev:["Nenhum compromisso."]);return ev.length?"Você tem "+ev.length+" compromisso(s): "+ev.join("; ")+".":"Nenhum compromisso nesse dia. Agenda livre."}
+$("#gcal").onclick=()=>gToken().catch(e=>$("#gst").textContent=e.message);
+
+/* ===== 6. Controle por voz (comandos locais) ===== */
+let last="";
+function control(t){const x=t.toLowerCase();
+ if(/\b(pare|cancele|silêncio|fique em silêncio|cala a boca)\b/.test(x)){speechSynthesis.cancel();setState("idle");return"parado"}
+ if(/repita/.test(x)){if(last){speak(last)}return"ok"}
+ if(/mais devagar/.test(x)){S.cfg.rate=Math.max(.6,S.cfg.rate-.2);saveAll();speak("Certo, mais devagar.");return"ok"}
+ if(/mais rápido/.test(x)){S.cfg.rate=Math.min(1.6,S.cfg.rate+.2);saveAll();speak("Certo, mais rápido.");return"ok"}
+ if(/desative o microfone|desligue o microfone/.test(x)){micOff();return"ok"}
+ if(/(abra|abrir) (as )?configurações/.test(x)){$("#side").classList.add("open");return"ok"}
+ return null}
+
+/* ===== 7. Orquestração ===== */
+let busy=false;
+async function handle(text){
+ text=text.trim();if(!text||busy)return;if(control(text))return;
+ busy=true;say("u",text);setState("thinking","ANALISANDO SOLICITAÇÃO");
+ try{let out,src=[],tool=TOOLS.map(t=>({t,m:t.test(text)})).find(x=>x.m);
+  if(tool){setState("executing","EXECUTANDO · "+tool.t.id.toUpperCase());out=await tool.t.run(tool.m,text)}
+  else{const r=await ask(text);out=r.text;src=r.sources||[]}
+  S.chat.push({role:"user",content:text},{role:"assistant",content:out});say("j",out,src);last=out;await saveAll();speak(out)}
+ catch(e){say("err",e.message);setState("error");setTimeout(()=>S.state==="error"&&setState("idle"),2500)}
+ finally{busy=false;if(S.state!=="speaking"&&S.state!=="error")setState(rec?"listening":"idle")}}
+$("#f").onsubmit=e=>{e.preventDefault();const v=$("#in").value;$("#in").value="";handle(v)};
+
+/* ===== 8. Síntese de voz ===== */
+let bump=0;
+function voices(){return speechSynthesis.getVoices().filter(v=>/^pt/i.test(v.lang))}
+function pickVoice(){const vs=voices();return vs.find(v=>v.name===S.cfg.voice)||vs.find(v=>/(male|masc|daniel|antonio|antônio|felipe|ricardo|luciano|jorge)/i.test(v.name)&&!/female|feminina/i.test(v.name))||vs.find(v=>/pt-BR/i.test(v.lang))||vs[0]}
+function speak(text){speechSynthesis.cancel();if(!S.cfg.tts){setState("idle");return}
+ const parts=text.replace(/https?:\/\/\S+/g,"").match(/[^.!?\n]+[.!?]*/g)||[];let i=0;
+ const next=()=>{if(i>=parts.length){setState(rec?"listening":"idle");return}const u=new SpeechSynthesisUtterance(parts[i++].trim());if(!u.text){next();return}
+  const v=pickVoice();if(v)u.voice=v;u.lang=v?v.lang:"pt-BR";u.rate=S.cfg.rate;u.pitch=S.cfg.pitch;u.volume=S.cfg.vol;
+  u.onstart=()=>setState("speaking");u.onboundary=()=>{bump=1};u.onend=next;u.onerror=()=>setState("idle");speechSynthesis.speak(u)};next()}
+speechSynthesis.onvoiceschanged=()=>buildVoices();
+
+/* ===== 9. Reconhecimento de voz e palavra de ativação ===== */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null,want=false,armedUntil=0;
+const WAKE=/(?:\be\s*a[eií]|\bei|\bhey|\boi)\s*,?\s*(?:j[áa]rvis|jarvis|garvis|jarvi)\b[\s,.:!-]*/i;
+function chime(){try{const a=new(window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.value=.05;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,a.currentTime+.25);o.stop(a.currentTime+.26)}catch(e){}}
+function micOn(){if(!SR){say("err","Este navegador não oferece reconhecimento de voz. Use o campo de texto (Chrome ou Edge recomendados).");return}
+ want=true;$("#mic").classList.add("on");start()}
+function micOff(){want=false;$("#mic").classList.remove("on");if(rec){try{rec.stop()}catch(e){}}rec=null;setState("idle")}
+function start(){if(!want)return;rec=new SR();rec.lang="pt-BR";rec.continuous=true;rec.interimResults=false;
+ rec.onstart=()=>{if(S.state==="idle")setState("listening")};
+ rec.onresult=ev=>{for(let i=ev.resultIndex;i<ev.results.length;i++){if(!ev.results[i].isFinal)continue;const t=ev.results[i][0].transcript.trim();if(!t)continue;
+  const speaking=speechSynthesis.speaking;const m=WAKE.exec(t);
+  if(speaking&&!(m||/^jarvis/i.test(t)))continue;   /* evita captar a própria voz */
+  if(m){chime();setState("listening","OUVINDO");const rest=t.slice(m.index+m[0].length).trim();if(rest)handle(rest);else armedUntil=Date.now()+8000}
+  else if(/^jarvis[\s,]/i.test(t)){handle(t.replace(/^jarvis[\s,]*/i,""))}
+  else if(Date.now()<armedUntil||!S.cfg.wake){armedUntil=0;handle(t)}}};
+ rec.onerror=e=>{if(e.error==="not-allowed"||e.error==="service-not-allowed"){say("err","Permissão do microfone negada. Libere nas configurações do site.");micOff()}else if(e.error!=="no-speech"&&e.error!=="aborted")say("err","Erro de reconhecimento: "+e.error)};
+ rec.onend=()=>{if(want)setTimeout(start,300)};try{rec.start()}catch(e){}}
+$("#mic").onclick=()=>want?micOff():micOn();
+
+/* ===== 10. Memória e cofre de chaves ===== */
+function renderMem(){const b=$("#mems");b.replaceChildren();S.mem.forEach((m,i)=>{const r=el("div","mem");r.append(el("span","",m.t));const x=el("button","","✕");x.setAttribute("aria-label","Apagar memória");x.onclick=async()=>{S.mem.splice(i,1);await saveAll();renderMem()};r.append(x);b.append(r)})}
+$("#memAdd").onclick=async()=>{const v=$("#memIn").value.trim();if(!v)return;S.mem.push({t:v.slice(0,300),d:Date.now()});$("#memIn").value="";await saveAll();renderMem()};
+$("#exp").onclick=()=>{const a=el("a");a.href=URL.createObjectURL(new Blob([JSON.stringify({mem:S.mem,chat:S.chat},null,1)],{type:"application/json"}));a.download="jarvis-dados.json";a.click()};
+$("#wipe").onclick=async()=>{if(!confirm("Apagar memórias, histórico e configurações deste navegador para esta conta?"))return;S.db.close();indexedDB.deleteDatabase("jarvis_"+S.user.sub);S.keys={};sessionStorage.clear();location.reload()};
+async function kdf(pw,salt){const k=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]);return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:250000,hash:"SHA-256"},k,{name:"AES-GCM",length:256},false,["encrypt","decrypt"])}
+const b64=u=>btoa(String.fromCharCode(...u)),ub=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+$("#vSave").onclick=async()=>{const pw=$("#pw").value;if(pw.length<8){say("err","Use uma senha de cofre com 8+ caracteres.");return}
+ const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+ const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},await kdf(pw,salt),new TextEncoder().encode(JSON.stringify(S.keys)));
+ await dbSet("vault",{s:b64(salt),i:b64(iv),c:b64(new Uint8Array(ct))});$("#pw").value="";say("j","Chaves guardadas com criptografia neste navegador. Se esquecer a senha, não há recuperação.")};
+$("#vOpen").onclick=async()=>{const v=await dbGet("vault");if(!v){say("err","Nenhum cofre salvo.");return}
+ try{const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:ub(v.i)},await kdf($("#pw").value,ub(v.s)),ub(v.c));S.keys=JSON.parse(new TextDecoder().decode(pt));$("#pw").value="";buildSettings();say("j","Cofre aberto.")}catch(e){say("err","Senha incorreta ou cofre corrompido.")}};
+
+/* ===== 11. Configurações ===== */
+function buildVoices(){const s=$("#voice");if(!s)return;s.replaceChildren();voices().forEach(v=>{const o=el("option","",v.name+" ("+v.lang+")");o.value=v.name;s.append(o)});s.value=(pickVoice()||{}).name||""}
+function buildSettings(){
+ buildVoices();renderMem();
+ for(const [k,e] of [["rate","#rate"],["pitch","#pitch"],["vol","#vol"],["fx","#fx"]]){$(e).value=S.cfg[k];$(e).oninput=()=>{S.cfg[k]=+$(e).value;saveAll()}}
+ for(const [k,e] of [["tts","#tts"],["wake","#wake"],["fb","#fb"]]){$(e).checked=S.cfg[k];$(e).onchange=()=>{S.cfg[k]=$(e).checked;saveAll()}}
+ $("#voice").onchange=()=>{S.cfg.voice=$("#voice").value;saveAll()};$("#mode").value=S.cfg.mode;$("#mode").onchange=()=>{S.cfg.mode=$("#mode").value;saveAll()};
+ $("#proxy").value=S.cfg.proxy;$("#proxy").onchange=()=>{const v=$("#proxy").value.trim();S.cfg.proxy=/^https:\/\//.test(v)?v:"";saveAll()};
+ const box=$("#ais");box.replaceChildren();
+ for(const id in AIS){const w=el("div","panel card");const h=el("div","row");const d=el("span","dot"+(S.keys[id]?" ok":""));h.append(d,el("b","",AIS[id].n));
+  const key=el("input");key.type="password";key.placeholder="API Key";key.autocomplete="off";key.value=S.keys[id]||"";
+  const show=el("button","","Ver");show.type="button";show.onclick=()=>{key.type=key.type==="password"?"text":"password"};
+  const mod=el("input");mod.setAttribute("list","dl");mod.placeholder=AIS[id].ph;mod.value=S.cfg.models[id]||"";mod.onchange=()=>{S.cfg.models[id]=mod.value.trim();saveAll()};
+  const info=el("div","small","Sem conexão.");
+  const test=el("button","","Testar");test.type="button";test.onclick=async()=>{S.keys[id]=key.value.trim();S.cfg.models[id]=mod.value.trim();info.textContent="Testando…";
+   try{const l=await P.list(id);d.className="dot ok";info.textContent="Conectado. "+l.length+" modelo(s) disponível(is) — digite no campo para ver a lista.";$("#dl").replaceChildren(...l.map(m=>{const o=el("option");o.value=m;return o}));saveAll()}catch(e){d.className="dot bad";info.textContent=e.message}};
+  const main=el("button","",S.cfg.main===id?"★ Principal":"Tornar principal");main.type="button";main.onclick=()=>{S.cfg.main=id;saveAll();buildSettings()};
+  const rm=el("button","","Remover");rm.type="button";rm.onclick=()=>{delete S.keys[id];delete S.cfg.models[id];saveAll();buildSettings()};
+  const r1=el("div","row");r1.append(key,show);const r2=el("div","row");r2.append(test,main,rm);w.append(h,r1,mod,r2,info);box.append(w)}}
+$("#menu").onclick=()=>$("#side").classList.toggle("open");$("#close").onclick=()=>$("#side").classList.remove("open");
+
+/* ===== 12. Núcleo de partículas (Canvas 2D com projeção 3D) ===== */
+const cv=$("#core"),cx=cv.getContext("2d"),N=1100,PT=[];
+for(let i=0;i<N;i++){const y=1-2*(i+.5)/N,r=Math.sqrt(1-y*y),th=i*2.399963;PT.push([Math.cos(th)*r,y,Math.sin(th)*r])}
+let W=0,Hh=0,ang=0,tm=0,en=0,lt=performance.now();
+function fit(){const d=Math.min(devicePixelRatio||1,2);W=innerWidth;Hh=innerHeight;cv.width=W*d;cv.height=Hh*d;cx.setTransform(d,0,0,d,0,0)}
+addEventListener("resize",fit);fit();
+const SP={idle:.12,listening:.35,thinking:1.5,searching:.9,speaking:.45,executing:1.1,error:.15};
+function frame(now){const dt=Math.min(.05,(now-lt)/1000);lt=now;tm+=dt;const s=S.state;ang+=SP[s]*dt;
+ const tgt=s==="listening"?.35+.25*Math.sin(tm*5):s==="thinking"?.4+.3*Math.sin(tm*9):s==="speaking"?bump*.9+.1:s==="searching"?.3:s==="executing"?.35:.04;
+ en+=(tgt-en)*Math.min(1,dt*8);bump*=.9;
+ cx.clearRect(0,0,W,Hh);const R=Math.min(W,Hh)*(innerWidth<760?.3:.26)*(1+.05*en),X=W/2,Y=Hh*(innerWidth<760?.4:.5);
+ const col=s==="error"?"255,91,110":"56,225,255",ca=Math.cos(ang),sa=Math.sin(ang),tx=Math.cos(.35),ty=Math.sin(.35),n=Math.floor(N*S.cfg.fx);
+ const sc=new Array(n);
+ for(let i=0;i<n;i++){const p=PT[i],k=1+.09*en*Math.sin(i*12.9+tm*(s==="thinking"?8:3));
+  let x=p[0]*ca+p[2]*sa,z=-p[0]*sa+p[2]*ca,y=p[1];const y2=y*tx-z*ty,z2=y*ty+z*tx,f=1/(1.25-z2*.35);
+  sc[i]=[X+x*R*k*f,Y+y2*R*k*f,z2]}
+ cx.lineWidth=.6;cx.strokeStyle="rgba("+col+",.16)";cx.beginPath();
+ for(let i=0;i<n;i++){for(const o of[1,21,34]){const j=i+o;if(j>=n)continue;const a=sc[i],b=sc[j];if(Math.abs(a[0]-b[0])+Math.abs(a[1]-b[1])<R*.2){cx.moveTo(a[0],a[1]);cx.lineTo(b[0],b[1])}}}cx.stroke();
+ for(let i=0;i<n;i++){const a=sc[i],d=(a[2]+1)/2;cx.fillStyle="rgba("+col+","+(.25+.75*d)+")";const r=.6+1.5*d;cx.fillRect(a[0]-r/2,a[1]-r/2,r,r)}
+ cx.strokeStyle="rgba("+col+",.35)";cx.lineWidth=1;
+ if(s==="searching"){for(let k=0;k<3;k++){const q=((tm*.6+k/3)%1);cx.globalAlpha=1-q;cx.beginPath();cx.arc(X,Y,R*(1+q*.6),0,6.283);cx.stroke()}cx.globalAlpha=1}
+ else if(s==="executing"){for(let k=0;k<3;k++){cx.beginPath();cx.ellipse(X,Y,R*1.18,R*.38,tm*(k+1)*.5+k*1.05,0,6.283);cx.stroke()}}
+ else{cx.beginPath();cx.arc(X,Y,R*1.22,tm*.2,tm*.2+4.2);cx.stroke();cx.beginPath();cx.arc(X,Y,R*1.3,-tm*.3,-tm*.3+1.6);cx.stroke()}
+ requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+
+/* ===== 13. Inicialização ===== */
+/* Login desativado por enquanto: entra como convidado local. Se houver sessão Google válida, usa-a. */
+function boot(){const old=sessionStorage.getItem("jv_cred");
+ try{if(old){const p=jwt(old);if(p.exp*1000>Date.now()){enter(p);return}}}catch(e){}
+ enter({sub:"local",name:"Convidado",email:"modo local (sem login)"})}
+$("#cid2").value=localStorage.getItem("jv_cid")||"";
+$("#cid2").onchange=()=>{const v=$("#cid2").value.trim();if(/^[\w.-]+\.apps\.googleusercontent\.com$/.test(v)){localStorage.setItem("jv_cid",v);$("#gst").textContent="Client ID salvo."}else $("#gst").textContent="Client ID inválido."};
+boot();
+addEventListener("unhandledrejection",e=>{say("err","Erro inesperado: "+(e.reason&&e.reason.message||e.reason))});
+</script>
+</body>
+</html>
